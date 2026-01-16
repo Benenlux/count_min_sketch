@@ -17,6 +17,14 @@ impl CountMinSketch {
         }
     }
 
+    pub fn transfer(other: CountMinSketch) -> Self {
+        Self {
+            columns: other.columns,
+            rows: other.rows,
+            table: other.table,
+        }
+    }
+
     // Private helper method to convert a str into a hash
     fn str_to_hash(to_hash: &str, seed: u32) -> u32 {
         murmur3_32(&mut Cursor::new(&to_hash), seed)
