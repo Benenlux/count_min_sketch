@@ -17,15 +17,14 @@ impl CountMinSketch {
         }
     }
     fn str_to_hash(to_hash: &str, seed: u32) -> u32 {
-        let hash = murmur3_32(&mut Cursor::new(&to_hash), seed)
-            .expect("Error: Murmur failed to read from memory buffer");
-        hash
+        murmur3_32(&mut Cursor::new(&to_hash), seed)
+            .expect("Error: Murmur failed to read from memory buffer")
     }
     pub fn insert(&mut self, to_hash: &str) {
         for row_idx in 0..self.rows {
             let hash = CountMinSketch::str_to_hash(to_hash, row_idx as u32);
             let column_to_fill = (hash % (self.columns as u32)) as usize;
-            self.table[row_idx][(column_to_fill)] += 1;
+            self.table[row_idx][column_to_fill] += 1;
         }
     }
     pub fn clear(&mut self) {
