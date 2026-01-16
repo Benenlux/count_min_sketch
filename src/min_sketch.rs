@@ -72,3 +72,86 @@ impl fmt::Display for CountMinSketch {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_initialization() {
+        let columns = 5;
+        let rows = 10;
+        let cms = CountMinSketch::new(columns, rows);
+
+        assert_eq!(cms.columns, columns);
+        assert_eq!(cms.rows, rows);
+
+        assert_eq!(cms.table.len(), rows);
+        assert_eq!(cms.table[0].len(), columns);
+    }
+
+    #[test]
+    fn test_insert_and_count() {
+        let columns = 8;
+        let rows = 11;
+
+        let mut cms = CountMinSketch::new(columns, rows);
+
+        let target_item = "Foo";
+        let noise_item = "Bar";
+
+        cms.insert(target_item);
+        cms.insert(noise_item);
+        cms.insert(target_item);
+
+        let count = cms.count(target_item);
+
+        assert!(count == 2);
+    }
+
+    #[test]
+    fn test_insert_and_clear() {
+        let columns = 10;
+        let rows = 5;
+
+        let mut cms = CountMinSketch::new(columns, rows);
+
+        let target_item = "Foo";
+        let noise_item = "Bar";
+
+        cms.insert(target_item);
+        cms.insert(noise_item);
+        cms.insert(target_item);
+
+        let count_before_clear = cms.count(target_item);
+        cms.clear();
+        let count_after_clear = cms.count(target_item);
+
+        assert!(count_before_clear == 2);
+        assert!(count_after_clear == 0);
+        assert_eq!(cms.columns, columns);
+        assert_eq!(cms.rows, rows);
+    }
+
+    #[test]
+    fn test_insert_and_transfer() {
+        let columns = 10;
+        let rows = 5;
+
+        let mut cms = CountMinSketch::new(columns, rows);
+
+        let target_item = "Foo";
+        let noise_item = "Bar";
+
+        cms.insert(target_item);
+        cms.insert(noise_item);
+        cms.insert(target_item);
+
+        let other_cms = CountMinSketch::transfer(cms);
+        let count = other_cms.count(target_item);
+        assert!(count == 2);
+        assert_eq!(other_cms.columns, columns);
+        assert_eq!(other_cms.rows, rows);
+    }
+}
