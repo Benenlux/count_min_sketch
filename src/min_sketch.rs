@@ -1,19 +1,29 @@
 use murmur3::murmur3_32;
 use std::fmt;
 use std::io::Cursor;
+use std::sync::atomic::{AtomicU32, Ordering};
+
 #[derive(Debug)]
 pub struct CountMinSketch {
     columns: usize,
     rows: usize,
-    pub table: Vec<Vec<u32>>,
+    pub table: Vec<Vec<AtomicU32>>,
 }
 
 impl CountMinSketch {
     pub fn new(columns: usize, rows: usize) -> Self {
+        let mut table = Vec::with_capacity(rows);
+        for _ in 0..rows {
+            let mut row = Vec::with_capacity(columns);
+            for _ in 0..columns {
+                row.push(AtomicU32::new(0));
+            }
+            table.push(row);
+        }
         Self {
             columns,
             rows,
-            table: vec![vec![0; columns]; rows],
+            table,
         }
     }
 
@@ -32,16 +42,24 @@ impl CountMinSketch {
     }
 
     // A method for inserting an item into the matrix
-    pub fn insert(&mut self, to_hash: &str) {
+    pub fn insert(&self, to_hash: &str) {
         for row_idx in 0..self.rows {
             let hash = CountMinSketch::str_to_hash(to_hash, row_idx as u32);
             let column_to_fill = (hash % (self.columns as u32)) as usize;
-            self.table[row_idx][column_to_fill] += 1;
+            self.table[row_idx][column_to_fill].fetch_add(1, Ordering::Relaxed);
         }
     }
 
     pub fn clear(&mut self) {
-        self.table = vec![vec![0; self.columns]; self.rows];
+        let mut table = Vec::with_capacity(self.rows);
+        for _ in 0..self.rows {
+            let mut row = Vec::with_capacity(self.columns);
+            for _ in 0..self.columns {
+                row.push(AtomicU32::new(0));
+            }
+            table.push(row);
+        }
+        self.table = table;
     }
 
     // A method for giving an estimated count for a given item
@@ -50,9 +68,9 @@ impl CountMinSketch {
         for row_idx in 0..self.rows {
             let hash_to_check = CountMinSketch::str_to_hash(item_to_count, row_idx as u32);
             let column_to_check = (hash_to_check % (self.columns as u32)) as usize;
-            let row_value = self.table[row_idx][column_to_check];
-            if row_value < min_count {
-                min_count = row_value;
+            let row_value = &self.table[row_idx][column_to_check];
+            if row_value.load(Ordering::Relaxed) < min_count {
+                min_count = row_value.load(Ordering::Relaxed);
             }
         }
         min_count
@@ -64,7 +82,8 @@ impl fmt::Display for CountMinSketch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, row) in self.table.iter().enumerate() {
             write!(f, "Row {}: ", i)?;
-            for &count in row {
+            for atom in row {
+                let count = atom.load(Ordering::Relaxed);
                 write!(f, "{:4} ", count)?;
             }
             writeln!(f)?;
